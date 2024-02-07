@@ -26,6 +26,7 @@ guard let results = try? ScanResults(binaryData: data) else {
 }
 
 print("Our scan indicates you went \(results.distance) feet at an average speed of \(results.speed) MPH!")
+// Output: Our scan indicates you went 2506 feet at an average speed of 28.8 MPH!
 ```
 
 If you have header data you want to ignore or only want to target a subset of bytes, `Data` subscripting is an easy shortcut.

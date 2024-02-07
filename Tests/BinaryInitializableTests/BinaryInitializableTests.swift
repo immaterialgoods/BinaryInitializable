@@ -212,7 +212,7 @@ final class BinaryInitializableTests: XCTestCase {
         #endif
     }
     
-    func testMacroValuesBigEndian() throws {
+    func testParserBigEndian() throws {
         #if canImport(BinaryInitializableMacros)
         
         do {
@@ -231,6 +231,45 @@ final class BinaryInitializableTests: XCTestCase {
             XCTAssertEqual(twentyEightEight, 28.8)
             XCTAssertEqual(negativeFive, -5)
             XCTAssertEqual(jenny, 8675309)
+        } catch {
+            XCTFail("Got error loading data during parser test: \(error)")
+        }
+
+        #else
+        throw XCTSkip("macros are only supported when running tests for the host platform")
+        #endif
+    }
+
+    func testParserError() throws {
+        #if canImport(BinaryInitializableMacros)
+        
+        do {
+            
+            let parser = BinaryInitializationParser(testDataLittleEndian)
+            
+            let fiftyTwo: UInt32 = try parser.nextValue()
+            let twentyFiveOhSix: UInt32 = try parser.nextValue()
+            let ninetyEightPointSix: Float = try parser.nextValue()
+            let twentyEightEight: Double = try parser.nextValue()
+            let negativeFive: Int32 = try parser.nextValue()
+            let jenny: UInt32 = try parser.nextValue()
+
+            XCTAssertEqual(fiftyTwo, 52)
+            XCTAssertEqual(twentyFiveOhSix, 2506)
+            XCTAssertEqual(ninetyEightPointSix, 98.6)
+            XCTAssertEqual(twentyEightEight, 28.8)
+            XCTAssertEqual(negativeFive, -5)
+            XCTAssertEqual(jenny, 8675309)
+
+            // At this point all data is read; any further reading should result in an error.
+            // Can't do an assignment inside `XCTAssertThrowsError` so make a little function we can call.
+            func thrower() throws {
+                let _: UInt32 = try parser.nextValue()
+            }
+            
+            XCTAssertThrowsError(try thrower()) { error in
+                XCTAssertEqual(error as! BinaryInitializationParser.ParserError, BinaryInitializationParser.ParserError.dataExhaused)
+            }
         } catch {
             XCTFail("Got error loading data during parser test: \(error)")
         }

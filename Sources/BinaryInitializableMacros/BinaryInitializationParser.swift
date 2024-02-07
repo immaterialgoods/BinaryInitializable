@@ -8,12 +8,12 @@ import Foundation
 public class BinaryInitializationParser {
     
     /// In case there's an error.
-    enum ParserError: CustomStringConvertible, Error {
+    public enum ParserError: CustomStringConvertible, Error {
         
         case dataExhaused
         case copyFailure
 
-        var description: String {
+        public var description: String {
             switch self {
             case .dataExhaused: return "Not enough data remaining to initialize value."
             case .copyFailure: return "Not enough data was copied into the value."
@@ -23,15 +23,15 @@ public class BinaryInitializationParser {
     }
     
     /// The data the parser is reading from.
-    let data: Data
+    public let data: Data
     
     /// The data's endianness.
-    let isBigEndian: Bool
+    public let isBigEndian: Bool
     
     /// The current index from which the parser will begin its next read.
     /// The parser always begins at the data's `.startIndex`.
     /// If you need to start at a particular location, use Data's subscripting to pass in a subset of your overall data.
-    private(set) var nextIndex: Data.Index
+    public private(set) var nextIndex: Data.Index
 
     /// Initialize with the data to be read from, along with the endianness of the data.
     public init(_ data: Data, isBigEndian: Bool = false) {

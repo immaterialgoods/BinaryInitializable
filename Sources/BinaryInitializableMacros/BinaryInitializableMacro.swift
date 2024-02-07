@@ -15,8 +15,11 @@ public struct BinaryInitializableMacro: MemberMacro, ExtensionMacro {
                                  conformingTo protocols: [TypeSyntax],
                                  in context: some MacroExpansionContext)
     throws -> [ExtensionDeclSyntax] {
+        
+        // This one is simple. Just build the extension to conform to BinaryInitialization
         let binaryInitializationExtension = try ExtensionDeclSyntax("extension \(type.trimmed): BinaryInitialization {}")
         return [binaryInitializationExtension]
+        
     }
     
     /// Builds initializer
@@ -25,15 +28,8 @@ public struct BinaryInitializableMacro: MemberMacro, ExtensionMacro {
                                  conformingTo protocols: [TypeSyntax],
                                  in context: some MacroExpansionContext)
     throws -> [DeclSyntax] {
-        let members: MemberBlockItemListSyntax
-        if let structDecl = declaration.as(StructDeclSyntax.self) {
-            members = structDecl.memberBlock.members
-        } else if let classDecl = declaration.as(ClassDeclSyntax.self) {
-            members = classDecl.memberBlock.members
-        } else {
-            throw BinaryInitializableMacroError.onlyApplicableToStructOrClass
-        }
         
+        // Check the arguments to see if we should use big endian
         var bigEndian: Bool = false
         if case .argumentList(let arguments) = node.arguments {
             for argument in arguments.compactMap({ $0.as(LabeledExprSyntax.self) }) {
@@ -44,24 +40,37 @@ public struct BinaryInitializableMacro: MemberMacro, ExtensionMacro {
                 }
             }
         }
+
+        // Grab the list of properties of the struct or class.
+        let properties: MemberBlockItemListSyntax
+        if let structDecl = declaration.as(StructDeclSyntax.self) {
+            properties = structDecl.memberBlock.members
+        } else if let classDecl = declaration.as(ClassDeclSyntax.self) {
+            properties = classDecl.memberBlock.members
+        } else {
+            // Hey, this isn't meant to be used on anything else!
+            throw BinaryInitializableMacroError.onlyApplicableToStructOrClass
+        }
         
-        let variableNames = members
+        // Filter out static properties, then map to just property names (that's all we need)
+        let propertyNames = properties
             .compactMap { $0.decl.as(VariableDeclSyntax.self) }
-            .filter {
-                $0.modifiers.contains(where: { $0.name.text == "static" }) == false
-            }
+            .filter { $0.modifiers.contains(where: { $0.name.text == "static" }) == false }
             .compactMap { $0.bindings.first?.pattern }
 
+        // Build the initializer. First the header, then the body.
         let header = SyntaxNodeString(stringLiteral: "public init(binaryData: Data) throws")
         let initializer = try InitializerDeclSyntax(header) {
-            if variableNames.isEmpty == false {
+            // Don't output the parser code if there are no properties
+            // (compiler will give an "unused variable" warning)
+            if propertyNames.isEmpty == false {
                 if bigEndian {
                     "    let parser = BinaryInitializationParser(binaryData, isBigEndian: true)"
                 } else {
                     "    let parser = BinaryInitializationParser(binaryData, isBigEndian: false)"
                 }
             }
-            for name in variableNames {
+            for name in propertyNames {
                 ExprSyntax("    self.\(name) = try parser.nextValue()")
             }
         }
@@ -71,6 +80,7 @@ public struct BinaryInitializableMacro: MemberMacro, ExtensionMacro {
     
 }
 
+/// This error is shown to the user by the compiler if they attempt to attach this macro to something that is not a struct or class.
 public enum BinaryInitializableMacroError: CustomStringConvertible, Error {
     case onlyApplicableToStructOrClass
     
@@ -81,7 +91,7 @@ public enum BinaryInitializableMacroError: CustomStringConvertible, Error {
     }
 }
 
-
+/// Necessary boilerplate
 @main
 struct BinaryInitializablePlugin: CompilerPlugin {
     let providingMacros: [Macro.Type] = [
